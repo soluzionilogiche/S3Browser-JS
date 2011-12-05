@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html 
+     PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="it" lang="it">
+	<head>
+		<title>My Contents - IFrame -</title>
+		
+		<script type="text/javascript" src="jquery-1.7.1.min.js"></script>
+		
+		<style type="text/css">
+		* {
+			font-family: "Courier New";
+			font-size: 12px;
+		}
+		
+		td {
+			padding-left: 5px;
+			padding-right: 5px;
+		}
+		
+		#location {
+			font-weight: bold;
+		}
+		
+		.size {
+			text-align: right;
+		}
+		</style>
+		<script type="text/javascript">
+		//<![CDATA[
+		
+		/* ---- Config parameters ---- */
+		var urlThisDocument = 'browser.html';
+		var urlPublicBase = 'http://my.cname.site/';
+		var urlS3BrowserFolderExclude = '_s3browserfiles/';
+		var urlS3BrowserIndexExclude = 'index.html';
+		/* --------------------------- */
+		
+		var G_xml = null;
+		var G_list = null;
+		var G_labelLocation = null;
+		
+		var listFolders = new Array();
+		var listFiles = new Array();
+		var tmpFileObject = null;
+		var folderParent = null;
+				
+		function S3FileObject() {
+			this.name = null;
+			this.size = null;
+			this.lastModified = null;
+			this.folderParent = null;
+			
+			this.getUrl = function() {
+				var p = (this.folderParent == null)? '' : this.folderParent;
+				return p + this.name;
+			};
+		}
+		
+		jQuery(document).ready(function(){
+			G_labelLocation = jQuery('#location');
+			G_list = jQuery('#objectslist');
+			
+			folderParent = decodeURI(gup('folder'));
+			var urlXmlProvider = 'http://mybucket.amazonaws.com';
+			
+			createBreadCrumb();
+			
+			jQuery.ajax({
+				url: urlXmlProvider,
+				success: function(data, textStatus, jqXHR) {
+					G_xml = data;
+					if(folderParent != null && folderParent.length > 0) var objs = jQuery('Contents:contains('+folderParent+')', data);
+					else var objs = jQuery('Contents', data);
+					
+					for(var i = 0; i < objs.length; i++) {
+						var obj = objs[i];
+						var f = new S3FileObject();
+						f.name = obj.getElementsByTagName('Key')[0].textContent;
+						f.size = obj.getElementsByTagName('Size')[0].textContent;
+						f.lastModified = obj.getElementsByTagName('LastModified')[0].textContent;
+						
+						processFileObject(f);
+					}					
+					
+					if(folderParent) { appendFolderUp(); }
+					if(listFolders.length > 0) { appendFolderObjects(listFolders); }
+					if(listFiles.length > 0) { appendFileObjects(listFiles); }
+				},
+				dataType: 'xml'
+			});
+			
+		});
+		
+		function appendFolderUp() {
+			var currentFolder = folderParent;
+			currentFolder = currentFolder.substring(0, currentFolder.slice(0, -1).lastIndexOf('/') + 1);
+			if(currentFolder.length > 0) currentFolder = '?folder='+encodeURI(currentFolder);
+			else currentFolder = urlThisDocument;
+			row = jQuery('<tr><td>&lt;up&gt;</td><td>&nbsp;</td><td><a href="'+currentFolder+'">..</a></td></tr>');
+			G_list.append(row);
+		}
+		
+		function appendS3FileObjectToList(item, type) {
+			var row = null;
+			if(type == 'folder')
+				row = jQuery('<tr><td>&lt;dir&gt;</td><td>'+item.lastModified+'</td><td><a href="?folder='+encodeURI(item.getUrl())+'">'+item.name+'</a></td></tr>');
+			else if(type == 'file')
+				row = jQuery('<tr><td class="size">'+item.size+'&nbsp;B</td><td>'+item.lastModified+'</td><td><a target="_blank" href="'+urlPublicBase+item.getUrl()+'">'+item.name+'</a></td></tr>');
+			else return;
+			
+			G_list.append(row);
+		}
+		
+		function appendFolderObjects(obj) {
+			for(var i = 0; i < obj.length; i++) {
+				appendS3FileObjectToList(obj[i], 'folder');
+			}
+		}
+		
+		function appendFileObjects(obj) {
+			var tgt = jQuery('#objectslist');
+			
+			for(var i = 0; i < obj.length; i++) {
+				appendS3FileObjectToList(obj[i], 'file');
+			}
+		}
+		
+		function processFileObject(obj) {
+			var lastFolder = (listFolders.length > 0)? listFolders[listFolders.length - 1] : null;
+			
+			// I want to exclude s3browser folder
+			if(obj.name.indexOf(urlS3BrowserFolderExclude)  == 0) return;
+			
+			// If I'm in a subfolder than I'll not add the folder base itself into the list
+			if(folderParent.length > 0) {
+				if(obj.name == this.folderParent) return;
+				obj.name = obj.name.slice(folderParent.length);
+				obj.folderParent = folderParent;
+			}
+			
+			if(obj.size == 0 && obj.name.slice(-1) == '/') {
+				// Perhaps it's a folder
+				if(!lastFolder || obj.name.indexOf(lastFolder.name) == -1) {
+					listFolders.push(obj);
+					return;
+				}
+			}
+			else {
+				if(!lastFolder || obj.name.indexOf(lastFolder.name) == -1) {
+					listFiles.push(obj);
+					return;
+				}
+			}
+		}
+		
+		function createBreadCrumb() {
+			var sec = '';
+			var tmp = folderParent;
+			if(folderParent.length > 0)	var link = '[<a href="'+urlThisDocument+'">ROOT</a>]/';
+			else var link = '[ROOT]/';
+			
+			while(tmp.indexOf('/') != -1) {
+				var s = tmp.slice(0, tmp.indexOf('/'));
+				sec += s+'/';
+				if(tmp.indexOf('/') < tmp.lastIndexOf('/'))
+					link += '<a href="?folder='+encodeURI(sec)+'">'+s+'</a>/';
+				else
+					link += s+'/';
+				tmp = tmp.slice(tmp.indexOf('/') + 1);
+				
+				G_labelLocation.append(link);
+			}
+			
+			G_labelLocation.html(link);
+		}
+		
+		function gup(name){
+			name = name.replace(/[\[]/,"\\\[").replace(/[\]]/,"\\\]");
+			var regexS = "[\\?&]"+name+"=([^&#]*)";
+			var regex = new RegExp( regexS );
+			var results = regex.exec( window.location.href );
+			if( results == null )
+				return "";
+			else
+				return results[1];
+		}
+		//]]>
+		</script>
+	</head>
+	<div>
+	Current folder: <span id="location">ROOT</span>
+	</div>
+	<body>
+		<table>
+			<thead>
+				<tr>
+					<th>Size</th>
+					<th>Last modified</th>
+					<th>Name</td>
+				</tr>
+			</thead>
+			<tbody id="objectslist">
+			</tbody>
+		</table>
+		<p><small>S3Browser JS v0.1</small></p>
+	</body>
+</html>

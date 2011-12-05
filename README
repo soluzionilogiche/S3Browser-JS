@@ -1,0 +1,23 @@
+This little utility is without whistles and bells, it's a mere exercise inspired by the work of "frhack": Amazon S3 bucket listing.
+
+All the "system" is in two plain HTML pages with confused JavaScript and a classic release of jQuery.
+
+What this program can do:
+	Browse your public bucket and show to users a comprehensive list of files instead of a good formatted, yet unfriendly and un-user-able, xml file.
+	The script will not work with more than 1000 objects, which is the current (as I write) limit for a truncated XML list... as far as I know this script will not work with 100 file either :P it's too crappy ... or well.. let's give it a try.
+
+What this program can't do:
+	The complement of what it can do.
+
+* Installation
+You have to configure your bucket to be public, after that, configure it to expose a index page for the anonymous user.
+Configure _s3browserfiles/browser.html:
+	Set urlThisDocument with the name of the page itself.
+	Set urlPublicBase with your bucket CNAME or bucket URL in case you don't own one.
+	Set urlS3BrowserFolderExclude with the name of the folder which holds the file itself... in case you dislike the one I provided.
+	Set urlS3BrowserIndexExclude with the name of the index file in order to exclude it from the list.
+Configure index.html to properly locate the browser.html page within the IFRAME, if you use a CNAME for the bucket then this URL must be the canonical one provided by Amazon (ex my.bucket.s3.amazonaws.com) and not the CNAME one.
+Copy index.html along with _s3browserfiles folder (and its content) into the root folder of your public bucket.
+Call your bucket from your index page and et voilà!
+
+You should also consider to setup a couple of IAM policies to manage your bucket files.
